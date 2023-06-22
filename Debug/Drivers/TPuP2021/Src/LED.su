@@ -1,3 +1,3 @@
-LED.c:12:6:LED_InitGreen	16	static
-LED.c:17:6:LED_DispGreen	16	static
-LED.c:25:6:LED_SetFreqGreen	16	static
+../Drivers/TPuP2021/Src/LED.c:12:6:LED_InitGreen	16	static
+../Drivers/TPuP2021/Src/LED.c:17:6:LED_DispGreen	16	static
+../Drivers/TPuP2021/Src/LED.c:25:6:LED_SetFreqGreen	16	static

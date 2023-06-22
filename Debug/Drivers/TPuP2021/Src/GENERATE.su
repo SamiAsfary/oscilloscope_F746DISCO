@@ -1,2 +1,2 @@
-GENERATE.c:9:6:GENE_TogglePin	16	static
-GENERATE.c:18:6:GENE_SetFreqPin	16	static
+../Drivers/TPuP2021/Src/GENERATE.c:9:6:GENE_TogglePin	16	static
+../Drivers/TPuP2021/Src/GENERATE.c:18:6:GENE_SetFreqPin	16	static

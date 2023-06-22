@@ -1,21 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file    stm32f7xx_it.c
-  * @brief   Interrupt Service Routines.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    stm32f7xx_it.c
+ * @brief   Interrupt Service Routines.
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under Ultimate Liberty license
+ * SLA0044, the "License"; You may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at:
+ *                             www.st.com/SLA0044
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
@@ -25,13 +25,14 @@
 /* USER CODE BEGIN Includes */
 #include "LED.h"
 #include "GENERATE.h"
-#include "INTERFAC.h"
 #include "stm32746g_discovery_ts.h"
 #include "stm32746g_discovery.h"
 #include "stm32746g_discovery_sdram.h"
 //#include "stm32746g_discovery_ts.h"
 #include "stm32746g_discovery_lcd.h"
 #include <string.h>
+#include "FreeRTOS.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,10 +55,12 @@
 float temps=0;
 extern TS_StateTypeDef g_ts;
 extern int boucle;
-extern uint32_t g_value[300];
+extern uint32_t g_value[600];
 extern uint8_t g_frameset;
-char bufStr[40];
+//char bufStr[40];
 int time = 0;
+
+extern SemaphoreHandle_t sem_display;
 /*
 uint16_t min = 4095, max = 0;
 uint8_t indelay = 0;
@@ -104,9 +107,9 @@ void NMI_Handler(void)
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-  while (1)
-  {
-  }
+	while (1)
+	{
+	}
   /* USER CODE END NonMaskableInt_IRQn 1 */
 }
 
@@ -171,19 +174,6 @@ void UsageFault_Handler(void)
 }
 
 /**
-  * @brief This function handles System service call via SWI instruction.
-  */
-void SVC_Handler(void)
-{
-  /* USER CODE BEGIN SVCall_IRQn 0 */
-
-  /* USER CODE END SVCall_IRQn 0 */
-  /* USER CODE BEGIN SVCall_IRQn 1 */
-
-  /* USER CODE END SVCall_IRQn 1 */
-}
-
-/**
   * @brief This function handles Debug monitor.
   */
 void DebugMon_Handler(void)
@@ -194,33 +184,6 @@ void DebugMon_Handler(void)
   /* USER CODE BEGIN DebugMonitor_IRQn 1 */
 
   /* USER CODE END DebugMonitor_IRQn 1 */
-}
-
-/**
-  * @brief This function handles Pendable request for system service.
-  */
-void PendSV_Handler(void)
-{
-  /* USER CODE BEGIN PendSV_IRQn 0 */
-
-  /* USER CODE END PendSV_IRQn 0 */
-  /* USER CODE BEGIN PendSV_IRQn 1 */
-
-  /* USER CODE END PendSV_IRQn 1 */
-}
-
-/**
-  * @brief This function handles System tick timer.
-  */
-void SysTick_Handler(void)
-{
-  /* USER CODE BEGIN SysTick_IRQn 0 */
-
-  /* USER CODE END SysTick_IRQn 0 */
-
-  /* USER CODE BEGIN SysTick_IRQn 1 */
-
-  /* USER CODE END SysTick_IRQn 1 */
 }
 
 /******************************************************************************/
@@ -236,15 +199,20 @@ void SysTick_Handler(void)
 void ADC_IRQHandler(void)
 {
   /* USER CODE BEGIN ADC_IRQn 0 */
+	uint8_t sem = 0;
+	BaseType_t higher_priority_task_woken = pdFALSE;
 	uint32_t val=HAL_ADC_GetValue(&hadc3);
 	newpoint(val, time);
-	g_value[time] = val;
-	if(time < 299){
-		time++;
-	}else{
-		time = 0;
-		g_frameset = 1;
+	//g_value[time] = val;
+	if(time >= 499 || time == 300){
+		xSemaphoreGiveFromISR(sem_display,&higher_priority_task_woken);
+		sem = 1;
+		if(time>=499){
+			time = 0;
+		}
+
 	}
+	time++;
 	/*
 	if(min > val){min = val;}
 	if(max < val){max = val;}
@@ -281,7 +249,11 @@ void ADC_IRQHandler(void)
   /* USER CODE END ADC_IRQn 0 */
   HAL_ADC_IRQHandler(&hadc3);
   /* USER CODE BEGIN ADC_IRQn 1 */
-
+	if(sem == 1){
+		LED_DispGreen(((LED_NbTimes++)>>4)&1);
+		portYIELD_FROM_ISR(higher_priority_task_woken);
+		sem = 0;
+	}
   /* USER CODE END ADC_IRQn 1 */
 }
 
@@ -305,7 +277,7 @@ void TIM1_BRK_TIM9_IRQHandler(void)
 void TIM2_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM2_IRQn 0 */
-	LED_DispGreen((LED_NbTimes++)%2);
+	//LED_DispGreen((LED_NbTimes++)%2);
   /* USER CODE END TIM2_IRQn 0 */
   HAL_TIM_IRQHandler(&htim2);
   /* USER CODE BEGIN TIM2_IRQn 1 */
@@ -344,9 +316,9 @@ void TIM4_IRQHandler(void)
 			}
 			int freq = g_ts.touchX[0]*100/480;
 
-					GENE_SetFreqPin(freq);
-					//sprintf(str,"frequence = %d Hz ",(freq));
-					BSP_LCD_DisplayStringAtLine(5,str );
+			GENE_SetFreqPin(freq);
+			//sprintf(str,"frequence = %d Hz ",(freq));
+			//BSP_LCD_DisplayStringAtLine(5,str );
 		}
 
 	}
@@ -365,7 +337,7 @@ void EXTI15_10_IRQHandler(void)
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
 	if(__HAL_GPIO_EXTI_GET_FLAG(GPIO_PIN_11)){
 		boucle++;
-	  }
+	}
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_11);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
@@ -408,7 +380,6 @@ void TIM7_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM7_IRQn 0 */
 	HAL_ADC_Start_IT(&hadc3);
-
   /* USER CODE END TIM7_IRQn 0 */
   HAL_TIM_IRQHandler(&htim7);
   /* USER CODE BEGIN TIM7_IRQn 1 */
@@ -447,4 +418,3 @@ void DMA2D_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
